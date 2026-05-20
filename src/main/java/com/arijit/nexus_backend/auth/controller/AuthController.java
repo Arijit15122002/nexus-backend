@@ -6,6 +6,7 @@ import com.arijit.nexus_backend.auth.dto.RegisterRequest;
 import com.arijit.nexus_backend.auth.service.AuthService;
 import lombok.RequiredArgsConstructor;
 import org.apache.coyote.Response;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -26,7 +27,7 @@ public class AuthController {
             AuthResponse response = authService.register(request);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            return ResponseEntity.unprocessableContent().body("Exception found in your request body" + e);
+            return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).build();
         }
     }
 
@@ -36,7 +37,7 @@ public class AuthController {
             AuthResponse response = authService.login(request);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            return ResponseEntity.unprocessableContent().body("Exception occurred while logging you in" + e);
+            return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).build();
         }
     }
 
