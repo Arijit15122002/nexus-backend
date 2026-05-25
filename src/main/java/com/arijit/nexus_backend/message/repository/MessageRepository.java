@@ -2,16 +2,18 @@ package com.arijit.nexus_backend.message.repository;
 
 import com.arijit.nexus_backend.conversation.entity.Conversation;
 import com.arijit.nexus_backend.message.entity.Message;
-import com.pgvector.PGvector;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 
-public interface MessageRepository extends JpaRepository<Message, Long> {
+public interface MessageRepository
+        extends JpaRepository<Message, Long> {
 
-    List<Message> findByConversationOrderByCreatedAtAsc(Conversation conversation);
+    List<Message> findByConversationOrderByCreatedAtAsc(
+            Conversation conversation
+    );
 
     @Query(
             value = """
@@ -27,11 +29,13 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
             nativeQuery = true
     )
     List<Message> findTopMessagesByConversation(
+
             @Param("conversationId")
             Long conversationId,
 
             @Param("limit")
             int limit
+
     );
 
     @Query(
@@ -40,16 +44,49 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
         FROM messages
         WHERE conversation_id = :conversationId
         AND id != :currentMessageId
-        ORDER BY embedding <=> CAST(:embedding AS vector)
+        
+        ORDER BY
+        (
+            (
+                1 - (
+                    embedding <=> CAST(:embedding AS vector)
+                )
+            ) * 0.7
+        )
+        +
+        (
+            (
+                importance_score / 10.0
+            ) * 0.2
+        )
+        +
+        (
+            CASE
+                WHEN created_at > NOW() - INTERVAL '1 day'
+                THEN 0.1
+                ELSE 0
+            END
+        )
+        DESC
+        
         LIMIT :limit
         """,
             nativeQuery = true
     )
-    List<Message> findSimilarMessages(
-            @Param("embedding") String embedding,
-            @Param("conversationId") Long conversationId,
-            @Param("currentMessageId") Long currentMessageId,
-            @Param("limit") int limit
+    List<Message> findRelevantMessages(
+
+            @Param("embedding")
+            String embedding,
+
+            @Param("conversationId")
+            Long conversationId,
+
+            @Param("currentMessageId")
+            Long currentMessageId,
+
+            @Param("limit")
+            int limit
+
     );
 
 }

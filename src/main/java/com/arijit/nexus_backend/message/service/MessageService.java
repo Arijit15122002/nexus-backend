@@ -50,13 +50,13 @@ public class MessageService {
     }
 
     @Transactional(readOnly = true)
-    public List<Message> findSimilarMessages(
+    public List<Message> findRelevantMessages(
             PGvector embedding,
             Long conversationId,
             Long currentMessageId,
             int limit
     ) {
-        return messageRepository.findSimilarMessages(
+        return messageRepository.findRelevantMessages(
                 embedding.toString(),  // ← convert to String
                 conversationId,
                 currentMessageId,

@@ -1,5 +1,7 @@
 package com.arijit.nexus_backend.ai.orchestrator;
 
+import com.arijit.nexus_backend.ai.classifier.dto.MemoryClassificationResult;
+import com.arijit.nexus_backend.ai.classifier.service.MemoryClassifierService;
 import com.arijit.nexus_backend.ai.embedding.service.EmbeddingService;
 import com.arijit.nexus_backend.ai.provider.gemini.service.GeminiService;
 import com.arijit.nexus_backend.conversation.entity.Conversation;
@@ -29,6 +31,8 @@ public class ChatOrchestratorService {
     private final ConversationService conversationService;
 
     private final MessageService messageService;
+
+    private final MemoryClassifierService memoryClassifierService;
 
     public Flux<String> chat(
             String prompt,
@@ -76,10 +80,7 @@ public class ChatOrchestratorService {
                             .title(
                                     prompt.substring(
                                             0,
-                                            Math.min(
-                                                    prompt.length(),
-                                                    30
-                                            )
+                                            Math.min(prompt.length(), 30)
                                     )
                             )
                             .user(user)
@@ -91,6 +92,15 @@ public class ChatOrchestratorService {
                     );
 
         }
+
+        // =========================
+        // CLASSIFY USER MEMORY
+        // =========================
+
+        MemoryClassificationResult classification =
+                memoryClassifierService.classify(
+                        prompt
+                );
 
         // =========================
         // GENERATE USER EMBEDDING
@@ -111,6 +121,12 @@ public class ChatOrchestratorService {
                         .role(MessageRole.USER)
                         .conversation(conversation)
                         .embedding(userEmbedding)
+                        .memoryType(
+                                classification.getMemoryType()
+                        )
+                        .importanceScore(
+                                classification.getImportanceScore()
+                        )
                         .build();
 
         userMessage =
@@ -129,11 +145,11 @@ public class ChatOrchestratorService {
                 );
 
         // =========================
-        // FETCH SIMILAR MESSAGES
+        // FETCH RELEVANT MEMORIES
         // =========================
 
-        List<Message> similarMessages =
-                messageService.findSimilarMessages(
+        List<Message> relevantMessages =
+                messageService.findRelevantMessages(
                         userEmbedding,
                         conversation.getId(),
                         userMessage.getId(),
@@ -141,31 +157,29 @@ public class ChatOrchestratorService {
                 );
 
         // =========================
-        // BUILD RAG CONTEXT
+        // BUILD CONTEXT
         // =========================
 
         StringBuilder contextBuilder =
                 new StringBuilder();
 
-        Set<Long> addedMessageIds =
+        Set<Long> addedIds =
                 new HashSet<>();
 
         // =========================
-        // SYSTEM MEMORY
+        // MEMORY CONTEXT
         // =========================
 
-        contextBuilder.append(
-                """
+        contextBuilder.append("""
                 SYSTEM MEMORY:
                                 
-                """
-        );
+                """);
 
-        for (Message message : similarMessages) {
+        for (Message message : relevantMessages) {
 
             if (
                     message.getId() == null
-                            || addedMessageIds.contains(
+                            || addedIds.contains(
                             message.getId()
                     )
             ) {
@@ -174,7 +188,7 @@ public class ChatOrchestratorService {
 
             }
 
-            addedMessageIds.add(
+            addedIds.add(
                     message.getId()
             );
 
@@ -187,23 +201,21 @@ public class ChatOrchestratorService {
         }
 
         // =========================
-        // RECENT CONVERSATION
+        // RECENT CHAT CONTEXT
         // =========================
 
-        contextBuilder.append(
-                """
-                                
+        contextBuilder.append("""
+
                                 
                 RECENT CONVERSATION:
                                 
-                """
-        );
+                """);
 
         for (Message message : recentMessages) {
 
             if (
                     message.getId() == null
-                            || addedMessageIds.contains(
+                            || addedIds.contains(
                             message.getId()
                     )
             ) {
@@ -212,7 +224,7 @@ public class ChatOrchestratorService {
 
             }
 
-            addedMessageIds.add(
+            addedIds.add(
                     message.getId()
             );
 
@@ -225,17 +237,15 @@ public class ChatOrchestratorService {
         }
 
         // =========================
-        // CURRENT USER MESSAGE
+        // CURRENT USER INPUT
         // =========================
 
-        contextBuilder.append(
-                """
-                                
+        contextBuilder.append("""
+
                                 
                 CURRENT USER MESSAGE:
                                 
-                """
-        );
+                """);
 
         contextBuilder.append(prompt);
 
@@ -243,7 +253,7 @@ public class ChatOrchestratorService {
                 contextBuilder.toString();
 
         // =========================
-        // STREAM AI RESPONSE
+        // STREAM RESPONSE
         // =========================
 
         StringBuilder aiResponseBuilder =
@@ -271,10 +281,6 @@ public class ChatOrchestratorService {
                     }
 
                 })
-
-                // =========================
-                // SAVE AI MESSAGE
-                // =========================
 
                 .doOnComplete(() ->
 
@@ -305,6 +311,15 @@ public class ChatOrchestratorService {
                                         }
 
                                         // =========================
+                                        // CLASSIFY AI MEMORY
+                                        // =========================
+
+                                        MemoryClassificationResult aiClassification =
+                                                memoryClassifierService.classify(
+                                                        aiResponse
+                                                );
+
+                                        // =========================
                                         // GENERATE AI EMBEDDING
                                         // =========================
 
@@ -319,9 +334,7 @@ public class ChatOrchestratorService {
 
                                         Message aiMessage =
                                                 Message.builder()
-                                                        .content(
-                                                                aiResponse
-                                                        )
+                                                        .content(aiResponse)
                                                         .role(
                                                                 MessageRole.ASSISTANT
                                                         )
@@ -330,6 +343,12 @@ public class ChatOrchestratorService {
                                                         )
                                                         .embedding(
                                                                 aiEmbedding
+                                                        )
+                                                        .memoryType(
+                                                                aiClassification.getMemoryType()
+                                                        )
+                                                        .importanceScore(
+                                                                aiClassification.getImportanceScore()
                                                         )
                                                         .build();
 

@@ -31,6 +31,10 @@ public class Message {
     private String content;
 
     private LocalDateTime createdAt;
+    @PrePersist
+    public void prePersist() {
+        createdAt = LocalDateTime.now();
+    }
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "conversation_id")
@@ -40,4 +44,11 @@ public class Message {
     @org.hibernate.annotations.Type(PGvectorType.class)
     @Column(columnDefinition = "vector(3072)")
     private PGvector embedding;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "memory_type")
+    private MemoryType memoryType;
+
+    @Column(name = "importance_score")
+    private Integer importanceScore;
 }
