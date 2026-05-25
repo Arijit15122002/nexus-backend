@@ -1,10 +1,13 @@
 package com.arijit.nexus_backend.message.entity;
 
+import com.arijit.nexus_backend.ai.config.PGvectorType;
 import com.arijit.nexus_backend.conversation.entity.Conversation;
-import com.arijit.nexus_backend.conversation.entity.MessageRole;
 import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.pgvector.PGvector;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 
@@ -24,7 +27,6 @@ public class Message {
     @Enumerated(EnumType.STRING)
     private MessageRole role;
 
-    @Lob
     @Column(columnDefinition = "TEXT")
     private String content;
 
@@ -35,8 +37,7 @@ public class Message {
     @JsonBackReference
     private Conversation conversation;
 
-    @PrePersist
-    public void prePersist() {
-        createdAt = LocalDateTime.now();
-    }
+    @org.hibernate.annotations.Type(PGvectorType.class)
+    @Column(columnDefinition = "vector(3072)")
+    private PGvector embedding;
 }

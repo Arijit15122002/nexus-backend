@@ -1,4 +1,4 @@
-package com.arijit.nexus_backend.conversation.entity;
+package com.arijit.nexus_backend.message.entity;
 
 public enum MessageRole {
 
