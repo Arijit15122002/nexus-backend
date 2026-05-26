@@ -19,6 +19,11 @@ public class EmbeddingService {
 
     private final RestTemplate restTemplate;
 
+    // Switch from gemini-embedding-001 (shared quota) to text-embedding-004
+    // text-embedding-004 has a SEPARATE quota of 1500 RPM on the free tier —
+    // meaning it will never compete with your chat/classification Gemini calls.
+    // Output dimension is 768 floats (same as gemini-embedding-001).
+
     private static final String EMBEDDING_URL =
             "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=";
 
@@ -30,88 +35,45 @@ public class EmbeddingService {
         headers.setContentType(MediaType.APPLICATION_JSON);
 
         Map<String, Object> body = Map.of(
-
-                "model",
-                "models/gemini-embedding-001",
-
-                "content",
-                Map.of(
-                        "parts",
-                        List.of(
-                                Map.of(
-                                        "text",
-                                        text
-                                )
+                "content", Map.of(
+                        "parts", List.of(
+                                Map.of("text", text)
                         )
                 )
         );
 
-        HttpEntity<Map<String, Object>> request =
-                new HttpEntity<>(body, headers);
+        HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
 
         try {
 
-            ResponseEntity<Map> response =
-                    restTemplate.exchange(
-                            url,
-                            HttpMethod.POST,
-                            request,
-                            Map.class
-                    );
+            ResponseEntity<Map> response = restTemplate.exchange(
+                    url,
+                    HttpMethod.POST,
+                    request,
+                    Map.class
+            );
 
-            if (
-                    !response.getStatusCode().is2xxSuccessful()
-                            || response.getBody() == null
-            ) {
-
-                throw new RuntimeException(
-                        "Gemini embedding API error: "
-                                + response.getStatusCode()
-                );
-
+            if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
+                throw new RuntimeException("Gemini embedding API error: " + response.getStatusCode());
             }
 
-            Map<?, ?> embedding =
-                    (Map<?, ?>)
-                            response.getBody().get("embedding");
+            Map<?, ?> embedding = (Map<?, ?>) response.getBody().get("embedding");
 
-            if (
-                    embedding == null
-                            || !embedding.containsKey("values")
-            ) {
-
-                throw new RuntimeException(
-                        "Gemini response missing embedding values"
-                );
-
+            if (embedding == null || !embedding.containsKey("values")) {
+                throw new RuntimeException("Gemini response missing embedding values");
             }
 
-            List<?> rawValues =
-                    (List<?>) embedding.get("values");
-
-            float[] vector =
-                    new float[rawValues.size()];
+            List<?> rawValues = (List<?>) embedding.get("values");
+            float[] vector = new float[rawValues.size()];
 
             for (int i = 0; i < rawValues.size(); i++) {
-
-                Number number =
-                        (Number) rawValues.get(i);
-
-                vector[i] =
-                        number.floatValue();
-
+                vector[i] = ((Number) rawValues.get(i)).floatValue();
             }
 
             return new PGvector(vector);
 
         } catch (Exception e) {
-
-            throw new RuntimeException(
-                    "Failed to generate embedding: "
-                            + e.getMessage(),
-                    e
-            );
-
+            throw new RuntimeException("Failed to generate embedding: " + e.getMessage(), e);
         }
     }
 }

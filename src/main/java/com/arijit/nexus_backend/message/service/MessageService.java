@@ -64,4 +64,8 @@ public class MessageService {
         );
     }
 
+    public long countConversationMessages(Conversation conversation) {
+        return messageRepository.countByConversation(conversation);
+    }
+
 }

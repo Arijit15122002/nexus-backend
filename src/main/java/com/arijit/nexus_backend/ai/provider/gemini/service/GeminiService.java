@@ -23,60 +23,86 @@ public class GeminiService {
 
     private final WebClient webClient =
             WebClient.builder()
-                    .baseUrl("https://generativelanguage.googleapis.com")
+                    .baseUrl(
+                            "https://generativelanguage.googleapis.com"
+                    )
                     .build();
+
+    // =========================
+    // STABLE MODEL
+    // =========================
+
+    private static final String MODEL_GENERATE =
+            "/v1beta/models/gemini-1.5-flash-latest:generateContent";
 
     // =========================
     // NORMAL RESPONSE
     // =========================
 
-    public String generateResponse(String prompt) {
+    public String generateResponse(
+            String prompt
+    ) {
 
         try {
 
             String cleanedPrompt =
-                    prompt == null ? "" : prompt.trim();
+                    prompt == null
+                            ? ""
+                            : prompt.trim();
 
             if (cleanedPrompt.isBlank()) {
+
                 throw new RuntimeException(
                         "Prompt cannot be empty"
                 );
+
             }
 
-            Map<String, Object> requestBody = Map.of(
-                    "contents", List.of(
-                            Map.of(
-                                    "parts", List.of(
-                                            Map.of(
-                                                    "text",
-                                                    cleanedPrompt
+            Map<String, Object> requestBody =
+                    Map.of(
+                            "contents",
+                            List.of(
+                                    Map.of(
+                                            "parts",
+                                            List.of(
+                                                    Map.of(
+                                                            "text",
+                                                            cleanedPrompt
+                                                    )
                                             )
                                     )
                             )
-                    )
-            );
+                    );
 
             String response =
-                    webClient
-                            .post()
+                    webClient.post()
+
                             .uri(uriBuilder ->
                                     uriBuilder
-                                            .path(
-                                                    "/v1beta/models/gemini-2.5-flash:generateContent"
-                                            )
+                                            .path(MODEL_GENERATE)
                                             .queryParam(
                                                     "key",
                                                     apiKey
                                             )
                                             .build()
                             )
-                            .contentType(MediaType.APPLICATION_JSON)
+
+                            .contentType(
+                                    MediaType.APPLICATION_JSON
+                            )
+
                             .bodyValue(requestBody)
+
                             .retrieve()
+
                             .bodyToMono(String.class)
+
                             .block();
 
-            if (response == null || response.isBlank()) {
+            if (
+                    response == null
+                            || response.isBlank()
+            ) {
 
                 throw new RuntimeException(
                         "Empty response from Gemini"
@@ -95,8 +121,10 @@ public class GeminiService {
                             .path(0)
                             .path("text");
 
-            if (textNode.isMissingNode()
-                    || textNode.asText().isBlank()) {
+            if (
+                    textNode.isMissingNode()
+                            || textNode.asText().isBlank()
+            ) {
 
                 throw new RuntimeException(
                         "Gemini returned empty text"
@@ -121,138 +149,33 @@ public class GeminiService {
     }
 
     // =========================
-    // REAL STREAMING RESPONSE
+    // FAKE STREAMING
     // =========================
 
-    public Flux<String> generateResponseStream(String prompt) {
+    public Flux<String> generateResponseStream(
+            String prompt
+    ) {
 
-        try {
+        return Flux.create(sink -> {
 
-            String cleanedPrompt =
-                    prompt == null ? "" : prompt.trim();
+            try {
 
-            if (cleanedPrompt.isBlank()) {
+                String response =
+                        generateResponse(prompt);
 
-                return Flux.error(
-                        new RuntimeException(
-                                "Prompt cannot be empty"
-                        )
-                );
+                sink.next(response);
+
+                sink.complete();
 
             }
 
-            Map<String, Object> requestBody = Map.of(
-                    "contents", List.of(
-                            Map.of(
-                                    "parts", List.of(
-                                            Map.of(
-                                                    "text",
-                                                    cleanedPrompt
-                                            )
-                                    )
-                            )
-                    )
-            );
+            catch (Exception e) {
 
-            return webClient
-                    .post()
+                sink.error(e);
 
-                    .uri(uriBuilder ->
-                            uriBuilder
-                                    .path(
-                                            "/v1beta/models/gemini-2.5-flash:streamGenerateContent"
-                                    )
-                                    .queryParam(
-                                            "alt",
-                                            "sse"
-                                    )
-                                    .queryParam(
-                                            "key",
-                                            apiKey
-                                    )
-                                    .build()
-                    )
+            }
 
-                    .contentType(MediaType.APPLICATION_JSON)
-
-                    .accept(MediaType.TEXT_EVENT_STREAM)
-
-                    .bodyValue(requestBody)
-
-                    .retrieve()
-
-                    .bodyToFlux(String.class)
-
-                    .flatMap(chunk -> {
-
-                        try {
-
-                            // =========================
-                            // CLEAN SSE DATA
-                            // =========================
-
-                            String cleanedChunk =
-                                    chunk
-                                            .replace("data: ", "")
-                                            .trim();
-
-                            if (cleanedChunk.isBlank()) {
-                                return Flux.empty();
-                            }
-
-                            // =========================
-                            // PARSE JSON
-                            // =========================
-
-                            JsonNode root =
-                                    objectMapper.readTree(
-                                            cleanedChunk
-                                    );
-
-                            JsonNode textNode =
-                                    root.path("candidates")
-                                            .path(0)
-                                            .path("content")
-                                            .path("parts")
-                                            .path(0)
-                                            .path("text");
-
-                            if (textNode.isMissingNode()) {
-                                return Flux.empty();
-                            }
-
-                            String text =
-                                    textNode.asText();
-
-                            if (text.isBlank()) {
-                                return Flux.empty();
-                            }
-
-                            return Flux.just(text);
-
-                        }
-
-                        catch (Exception e) {
-
-                            return Flux.empty();
-
-                        }
-
-                    });
-
-        }
-
-        catch (Exception e) {
-
-            return Flux.error(
-                    new RuntimeException(
-                            "Gemini streaming failed: "
-                                    + e.getMessage(),
-                            e
-                    )
-            );
-
-        }
+        });
 
     }
 
