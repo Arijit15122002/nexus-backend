@@ -1,13 +1,15 @@
 package com.arijit.nexus_backend.ai.provider.gemini.controller;
 
-
 import com.arijit.nexus_backend.ai.orchestrator.ChatOrchestratorService;
 import com.arijit.nexus_backend.ai.provider.gemini.dto.ChatRequest;
+import com.arijit.nexus_backend.ai.stream.dto.StreamingChunk;
 import com.arijit.nexus_backend.user.entity.User;
 import com.arijit.nexus_backend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
+import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 
@@ -19,27 +21,53 @@ public class GeminiController {
     private final ChatOrchestratorService
             chatOrchestratorService;
 
-    private final UserRepository userRepository;
+    private final UserRepository
+            userRepository;
 
     @PostMapping(
             value = "/chat",
             produces = MediaType.TEXT_EVENT_STREAM_VALUE
     )
-    public Flux<String> chat(
+    public Flux<ServerSentEvent<StreamingChunk>> chat(
+
             @RequestBody ChatRequest request,
+
             Authentication authentication
+
     ) {
 
-        String email = authentication.getName();
+        UserDetails principal =
+                (UserDetails) authentication.getPrincipal();
 
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+        String email =
+                principal.getUsername();
 
-        return chatOrchestratorService.chat(
-                request.getMessage(),
-                request.getConversationId(),
-                user
-        );
+        User user =
+                userRepository.findByEmail(email)
+
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "User not found: " + email
+                                )
+                        );
+
+        return chatOrchestratorService
+
+                .chat(
+                        request.getMessage(),
+                        request.getConversationId(),
+                        user
+                )
+
+                .map(chunk ->
+
+                        ServerSentEvent
+                                .<StreamingChunk>builder()
+                                .data(chunk)
+                                .build()
+
+                );
 
     }
+
 }

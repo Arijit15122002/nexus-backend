@@ -35,11 +35,9 @@ public class EmbeddingService {
         headers.setContentType(MediaType.APPLICATION_JSON);
 
         Map<String, Object> body = Map.of(
-                "content", Map.of(
-                        "parts", List.of(
-                                Map.of("text", text)
-                        )
-                )
+                "model", "models/text-embedding-004",   // ← added
+                "content", Map.of("parts", List.of(Map.of("text", text))),
+                "outputDimensionality", 3072            // ← added to match your vector(3072) column
         );
 
         HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);

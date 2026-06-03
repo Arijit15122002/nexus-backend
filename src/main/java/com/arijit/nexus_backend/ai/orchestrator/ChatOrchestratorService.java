@@ -4,9 +4,13 @@ import com.arijit.nexus_backend.ai.classifier.dto.MemoryClassificationResult;
 import com.arijit.nexus_backend.ai.classifier.service.MemoryClassifierService;
 import com.arijit.nexus_backend.ai.embedding.service.EmbeddingService;
 import com.arijit.nexus_backend.ai.executor.dto.ExecutionContext;
+import com.arijit.nexus_backend.ai.executor.entity.ExecutionIntent;
 import com.arijit.nexus_backend.ai.executor.service.CapabilityExecutionService;
 import com.arijit.nexus_backend.ai.executor.service.ContextAssemblyService;
+import com.arijit.nexus_backend.ai.executor.service.ExecutionIntentDetectionService;
 import com.arijit.nexus_backend.ai.prompt.service.PromptEngineeringService;
+import com.arijit.nexus_backend.ai.stream.dto.StreamingChunk;
+import com.arijit.nexus_backend.ai.stream.entity.StreamingChunkType;
 import com.arijit.nexus_backend.ai.tool.dto.CapabilityDetectionResult;
 import com.arijit.nexus_backend.ai.tool.service.ToolRoutingService;
 import com.arijit.nexus_backend.conversation.entity.Conversation;
@@ -26,7 +30,8 @@ import reactor.core.publisher.Flux;
 import reactor.core.scheduler.Schedulers;
 
 import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
 @Slf4j
 @Service
@@ -41,19 +46,26 @@ public class ChatOrchestratorService {
 
     private final MemoryClassifierService memoryClassifierService;
 
-    private final MemoryConsolidationService memoryConsolidationService;
+    private final MemoryConsolidationService
+            memoryConsolidationService;
 
     private final MemorySummaryService memorySummaryService;
 
     private final ToolRoutingService toolRoutingService;
 
-    private final PromptEngineeringService promptEngineeringService;
+    private final PromptEngineeringService
+            promptEngineeringService;
 
-    private final CapabilityExecutionService capabilityExecutionService;
+    private final CapabilityExecutionService
+            capabilityExecutionService;
 
-    private final ContextAssemblyService contextAssemblyService;
+    private final ContextAssemblyService
+            contextAssemblyService;
 
-    public Flux<String> chat(
+    private final ExecutionIntentDetectionService
+            executionIntentDetectionService;
+
+    public Flux<StreamingChunk> chat(
 
             String prompt,
 
@@ -69,287 +81,301 @@ public class ChatOrchestratorService {
         ) {
 
             return Flux.just(
-                    "Prompt cannot be empty."
+
+                    StreamingChunk.builder()
+                            .type(StreamingChunkType.ERROR)
+                            .content("Prompt cannot be empty.")
+                            .completed(true)
+                            .build()
+
             );
 
         }
 
-        String trimmedPrompt =
-                prompt.trim();
-
         return Flux.defer(() -> {
 
-                    // =========================
-                    // CONVERSATION
-                    // =========================
+            String trimmedPrompt =
+                    prompt.trim();
 
-                    Conversation conversation;
+            // =========================
+            // CONVERSATION
+            // =========================
 
-                    if (conversationId != null) {
+            Conversation conversation;
 
-                        conversation =
-                                conversationService
-                                        .getConversation(
-                                                conversationId,
-                                                user
-                                        );
+            if (conversationId != null) {
 
-                    }
+                conversation =
+                        conversationService.getConversation(
+                                conversationId,
+                                user
+                        );
 
-                    else {
+            }
 
-                        Conversation newConversation =
-                                Conversation.builder()
+            else {
 
-                                        .title(
-                                                trimmedPrompt.substring(
-                                                        0,
-                                                        Math.min(
-                                                                trimmedPrompt.length(),
-                                                                30
-                                                        )
+                Conversation newConversation =
+                        Conversation.builder()
+                                .title(
+                                        trimmedPrompt.substring(
+                                                0,
+                                                Math.min(
+                                                        trimmedPrompt.length(),
+                                                        30
                                                 )
                                         )
+                                )
+                                .user(user)
+                                .build();
 
-                                        .user(user)
+                conversation =
+                        conversationService.createConversation(
+                                newConversation
+                        );
 
-                                        .build();
+            }
 
-                        conversation =
-                                conversationService
-                                        .createConversation(
-                                                newConversation
-                                        );
+            // =========================
+            // USER CLASSIFICATION
+            // =========================
 
-                    }
+            MemoryClassificationResult userClassification =
+                    memoryClassifierService.classify(
+                            trimmedPrompt
+                    );
 
-                    // =========================
-                    // USER CLASSIFICATION
-                    // =========================
+            // =========================
+            // USER EMBEDDING
+            // =========================
 
-                    MemoryClassificationResult
-                            userClassification =
+            PGvector userEmbedding =
+                    embeddingService.generateEmbedding(
+                            trimmedPrompt
+                    );
 
-                            memoryClassifierService
-                                    .classify(trimmedPrompt);
+            // =========================
+            // SAVE USER MESSAGE
+            // =========================
 
-                    // =========================
-                    // USER EMBEDDING
-                    // =========================
+            Message userMessage =
+                    Message.builder()
+                            .content(trimmedPrompt)
+                            .role(MessageRole.USER)
+                            .conversation(conversation)
+                            .embedding(userEmbedding)
+                            .memoryType(
+                                    userClassification.getMemoryType()
+                            )
+                            .importanceScore(
+                                    userClassification.getImportanceScore()
+                            )
+                            .build();
 
-                    PGvector userEmbedding =
-                            embeddingService
-                                    .generateEmbedding(
-                                            trimmedPrompt
-                                    );
+            userMessage =
+                    messageService.saveMessage(
+                            userMessage
+                    );
 
-                    // =========================
-                    // SAVE USER MESSAGE
-                    // =========================
+            // =========================
+            // MEMORY RETRIEVAL
+            // =========================
 
-                    Message userMessage =
-                            Message.builder()
+            List<Message> recentMessages =
+                    messageService.getRecentMessages(
+                            conversation.getId(),
+                            10
+                    );
 
-                                    .content(trimmedPrompt)
+            List<Message> relevantMessages =
+                    messageService.findRelevantMessages(
+                            userEmbedding,
+                            conversation.getId(),
+                            userMessage.getId(),
+                            5
+                    );
 
-                                    .role(MessageRole.USER)
+            List<MemorySummary> relevantSummaries =
+                    memorySummaryService.findRelevantSummaries(
+                            userEmbedding,
+                            conversation.getId(),
+                            3
+                    );
 
-                                    .conversation(conversation)
+            // =========================
+            // CONTEXT ASSEMBLY
+            // =========================
 
-                                    .embedding(userEmbedding)
+            String assembledContext =
+                    contextAssemblyService.assembleContext(
 
-                                    .memoryType(
-                                            userClassification
-                                                    .getMemoryType()
-                                    )
-
-                                    .importanceScore(
-                                            userClassification
-                                                    .getImportanceScore()
-                                    )
-
-                                    .build();
-
-                    userMessage =
-                            messageService
-                                    .saveMessage(userMessage);
-
-                    // =========================
-                    // MEMORY RETRIEVAL
-                    // =========================
-
-                    List<Message> recentMessages =
-                            messageService
-                                    .getRecentMessages(
-                                            conversation.getId(),
-                                            10
-                                    );
-
-                    List<Message> relevantMessages =
-                            messageService
-                                    .findRelevantMessages(
-
-                                            userEmbedding,
-
-                                            conversation.getId(),
-
-                                            userMessage.getId(),
-
-                                            5
-
-                                    );
-
-                    List<MemorySummary> relevantSummaries =
-                            memorySummaryService
-                                    .findRelevantSummaries(
-
-                                            userEmbedding,
-
-                                            conversation.getId(),
-
-                                            3
-
-                                    );
-
-                    // =========================
-                    // BUILD MEMORY CONTEXT
-                    // =========================
-
-                    String recentMessagesText =
-                            buildRecentMessagesText(
-                                    recentMessages
-                            );
-
-                    String relevantMessagesText =
                             buildRelevantMessagesText(
                                     relevantMessages
-                            );
+                            ),
 
-                    String summaryText =
+                            buildRecentMessagesText(
+                                    recentMessages
+                            ),
+
                             buildSummaryText(
                                     relevantSummaries
-                            );
+                            )
 
-                    String assembledContext =
-                            contextAssemblyService
-                                    .assembleContext(
+                    );
 
-                                            relevantMessagesText,
+            // =========================
+            // CAPABILITY DETECTION
+            // =========================
 
-                                            recentMessagesText,
+            CapabilityDetectionResult detectionResult =
+                    toolRoutingService.route(
+                            trimmedPrompt
+                    );
 
-                                            summaryText
+            ExecutionIntent executionIntent =
+                    executionIntentDetectionService.detect(
+                            trimmedPrompt
+                    );
 
-                                    );
+            log.info(
+                    "Intent={}",
+                    executionIntent
+            );
 
-                    // =========================
-                    // CAPABILITY DETECTION
-                    // =========================
+            log.info(
+                    "Capability={} | Domain={}",
 
-                    CapabilityDetectionResult
-                            detectionResult =
+                    detectionResult.getCapability(),
 
-                            toolRoutingService
-                                    .route(trimmedPrompt);
+                    detectionResult.getDomain()
+            );
 
-                    // =========================
-                    // PROMPT ENGINEERING
-                    // =========================
+            // =========================
+            // PROMPT ENGINEERING
+            // =========================
 
-                    String finalPrompt =
-                            promptEngineeringService
-                                    .buildPrompt(
+            String finalPrompt =
+                    promptEngineeringService.buildPrompt(
 
-                                            detectionResult
-                                                    .getCapability(),
+                            detectionResult.getCapability(),
 
-                                            trimmedPrompt,
+                            executionIntent,
 
-                                            assembledContext
+                            trimmedPrompt,
 
-                                    );
+                            assembledContext
 
-                    // =========================
-                    // EXECUTION CONTEXT
-                    // =========================
+                    );
 
-                    ExecutionContext executionContext =
-                            ExecutionContext.builder()
+            log.info(
+                    "FINAL PROMPT:\n{}",
+                    finalPrompt
+            );
 
-                                    .userMessage(trimmedPrompt)
+            // =========================
+            // EXECUTION CONTEXT
+            // =========================
 
-                                    .memoryContext(
-                                            assembledContext
+            ExecutionContext executionContext =
+                    ExecutionContext.builder()
+
+                            .userMessage(trimmedPrompt)
+
+                            .memoryContext(
+                                    assembledContext
+                            )
+
+                            .finalPrompt(finalPrompt)
+
+                            .capability(
+                                    detectionResult.getCapability()
+                            )
+
+                            .domain(
+                                    detectionResult.getDomain()
+                            )
+
+                            .executionMode(
+
+                                    capabilityExecutionService
+                                            .resolveExecutionMode(
+                                                    detectionResult.getCapability()
+                                            )
+
+                            )
+
+                            .executionIntent(
+                                    executionIntent
+                            )
+
+                            .build();
+
+            // =========================
+            // AI RESPONSE BUFFER
+            // =========================
+
+            AtomicReference<String> aiResponseBuffer =
+                    new AtomicReference<>("");
+
+            Conversation finalConversation =
+                    conversation;
+
+            // =========================
+            // METADATA CHUNK
+            // =========================
+
+            StreamingChunk metadataChunk =
+                    StreamingChunk.builder()
+
+                            .type(
+                                    StreamingChunkType.METADATA
+                            )
+
+                            .metadata(
+                                    Map.of(
+
+                                            "capability",
+                                            detectionResult.getCapability().name(),
+
+                                            "domain",
+                                            detectionResult.getDomain().name(),
+
+                                            "conversationId",
+                                            finalConversation.getId()
+
                                     )
+                            )
 
-                                    .finalPrompt(finalPrompt)
+                            .completed(false)
 
-                                    .capability(
-                                            detectionResult
-                                                    .getCapability()
-                                    )
+                            .build();
 
-                                    .domain(
-                                            detectionResult
-                                                    .getDomain()
-                                    )
+            // =========================
+            // EXECUTION
+            // =========================
 
-                                    .executionMode(
+            Flux<StreamingChunk> executionFlux =
 
-                                            capabilityExecutionService
-                                                    .resolveExecutionMode(
-
-                                                            detectionResult
-                                                                    .getCapability()
-
-                                                    )
-
-                                    )
-
-                                    .build();
-
-                    // =========================
-                    // STREAM RESPONSE
-                    // =========================
-
-                    StringBuffer aiResponseBuffer =
-                            new StringBuffer();
-
-                    AtomicBoolean isError =
-                            new AtomicBoolean(false);
-
-                    Conversation finalConversation =
-                            conversation;
-
-                    return capabilityExecutionService
+                    capabilityExecutionService
 
                             .execute(executionContext)
-
-                            .onErrorResume(error -> {
-
-                                log.error(
-                                        "Execution failed: {}",
-                                        error.getMessage(),
-                                        error
-                                );
-
-                                isError.set(true);
-
-                                return Flux.just(
-                                        "\n[AI is temporarily unavailable.]"
-                                );
-
-                            })
 
                             .doOnNext(chunk -> {
 
                                 if (
-                                        chunk != null
-                                                && !chunk.isBlank()
+                                        chunk.getType()
+                                                == StreamingChunkType.TEXT
+                                                &&
+                                                chunk.getContent() != null
                                 ) {
 
-                                    aiResponseBuffer
-                                            .append(chunk);
+                                    aiResponseBuffer.updateAndGet(
+
+                                            existing ->
+                                                    existing
+                                                            + chunk.getContent()
+
+                                    );
 
                                 }
 
@@ -357,144 +383,156 @@ public class ChatOrchestratorService {
 
                             .doOnComplete(() -> {
 
-                                if (isError.get()) {
-                                    return;
-                                }
+                                Schedulers.boundedElastic()
+                                        .schedule(() -> {
 
-                                try {
+                                            try {
 
-                                    String aiResponse =
-                                            aiResponseBuffer
-                                                    .toString()
-                                                    .trim();
+                                                String aiResponse =
+                                                        aiResponseBuffer
+                                                                .get()
+                                                                .trim();
 
-                                    if (aiResponse.isBlank()) {
-                                        return;
-                                    }
+                                                if (
+                                                        aiResponse.isBlank()
+                                                ) {
+                                                    return;
+                                                }
 
-                                    // =========================
-                                    // AI CLASSIFICATION
-                                    // =========================
+                                                // =========================
+                                                // AI CLASSIFICATION
+                                                // =========================
 
-                                    MemoryClassificationResult
-                                            aiClassification =
+                                                MemoryClassificationResult aiClassification =
+                                                        memoryClassifierService
+                                                                .classify(
+                                                                        aiResponse
+                                                                );
 
-                                            memoryClassifierService
-                                                    .classify(
-                                                            aiResponse
+                                                // =========================
+                                                // AI EMBEDDING
+                                                // =========================
+
+                                                PGvector aiEmbedding = null;
+
+                                                try {
+
+                                                    aiEmbedding =
+                                                            embeddingService
+                                                                    .generateEmbedding(
+                                                                            aiResponse
+                                                                    );
+
+                                                }
+
+                                                catch (Exception e) {
+
+                                                    log.warn(
+                                                            "AI embedding failed: {}",
+                                                            e.getMessage()
                                                     );
 
-                                    // =========================
-                                    // AI EMBEDDING
-                                    // =========================
+                                                }
 
-                                    PGvector aiEmbedding =
-                                            null;
+                                                // =========================
+                                                // SAVE AI MESSAGE
+                                                // =========================
 
-                                    try {
+                                                Message aiMessage =
+                                                        Message.builder()
 
-                                        aiEmbedding =
-                                                embeddingService
-                                                        .generateEmbedding(
-                                                                aiResponse
-                                                        );
+                                                                .content(
+                                                                        aiResponse
+                                                                )
 
-                                    }
+                                                                .role(
+                                                                        MessageRole.ASSISTANT
+                                                                )
 
-                                    catch (Exception e) {
+                                                                .conversation(
+                                                                        finalConversation
+                                                                )
 
-                                        log.warn(
-                                                "AI embedding failed: {}",
-                                                e.getMessage()
-                                        );
+                                                                .embedding(
+                                                                        aiEmbedding
+                                                                )
 
-                                    }
+                                                                .memoryType(
+                                                                        aiClassification.getMemoryType()
+                                                                )
 
-                                    // =========================
-                                    // SAVE AI MESSAGE
-                                    // =========================
+                                                                .importanceScore(
+                                                                        aiClassification.getImportanceScore()
+                                                                )
 
-                                    Message aiMessage =
-                                            Message.builder()
+                                                                .build();
 
-                                                    .content(aiResponse)
+                                                messageService.saveMessage(
+                                                        aiMessage
+                                                );
 
-                                                    .role(
-                                                            MessageRole.ASSISTANT
-                                                    )
+                                                // =========================
+                                                // MEMORY CONSOLIDATION
+                                                // =========================
 
-                                                    .conversation(
-                                                            finalConversation
-                                                    )
-
-                                                    .embedding(aiEmbedding)
-
-                                                    .memoryType(
-                                                            aiClassification
-                                                                    .getMemoryType()
-                                                    )
-
-                                                    .importanceScore(
-                                                            aiClassification
-                                                                    .getImportanceScore()
-                                                    )
-
-                                                    .build();
-
-                                    messageService
-                                            .saveMessage(aiMessage);
-
-                                    // =========================
-                                    // MEMORY CONSOLIDATION
-                                    // =========================
-
-                                    long messageCount =
-                                            messageService
-                                                    .countConversationMessages(
-                                                            finalConversation
-                                                    );
-
-                                    if (
-                                            messageCount >= 20
-                                                    && messageCount % 20 == 0
-                                    ) {
-
-                                        Schedulers
-                                                .boundedElastic()
-                                                .schedule(() -> {
-
-                                                    try {
-
-                                                        memoryConsolidationService
-                                                                .consolidateConversationMemory(
+                                                long messageCount =
+                                                        messageService
+                                                                .countConversationMessages(
                                                                         finalConversation
                                                                 );
 
-                                                    }
+                                                if (
+                                                        messageCount >= 20
+                                                                &&
+                                                                messageCount % 20 == 0
+                                                ) {
 
-                                                    catch (Exception e) {
+                                                    memoryConsolidationService
+                                                            .consolidateConversationMemory(
+                                                                    finalConversation
+                                                            );
 
-                                                        log.error(
-                                                                "Memory consolidation failed",
-                                                                e
-                                                        );
+                                                }
 
-                                                    }
+                                            }
 
-                                                });
+                                            catch (Exception e) {
 
-                                    }
+                                                log.error(
+                                                        "Post-processing failed",
+                                                        e
+                                                );
 
-                                }
+                                            }
 
-                                catch (Exception e) {
+                                        });
 
-                                    log.error(
-                                            "doOnComplete failed",
-                                            e
-                                    );
+                            })
 
-                                }
+                            .onErrorResume(error -> {
+
+                                log.error(
+                                        "Execution failed",
+                                        error
+                                );
+
+                                return Flux.just(
+
+                                        StreamingChunk.builder()
+
+                                                .type(
+                                                        StreamingChunkType.ERROR
+                                                )
+
+                                                .content(
+                                                        "AI execution failed."
+                                                )
+
+                                                .completed(true)
+
+                                                .build()
+
+                                );
 
                             })
 
@@ -502,25 +540,20 @@ public class ChatOrchestratorService {
                                     Schedulers.boundedElastic()
                             );
 
-                })
+            return Flux.concat(
 
-                .onErrorResume(error -> {
+                    Flux.just(metadataChunk),
 
-                    log.error(
-                            "Chat orchestration failed",
-                            error
-                    );
+                    executionFlux
 
-                    return Flux.just(
-                            "\n[An error occurred while processing your request.]"
-                    );
+            );
 
-                });
+        });
 
     }
 
     // =========================
-    // RECENT
+    // RECENT MESSAGES
     // =========================
 
     private String buildRecentMessagesText(
@@ -533,11 +566,8 @@ public class ChatOrchestratorService {
         for (Message message : messages) {
 
             sb.append(message.getRole())
-
                     .append(": ")
-
                     .append(message.getContent())
-
                     .append("\n");
 
         }
@@ -547,7 +577,7 @@ public class ChatOrchestratorService {
     }
 
     // =========================
-    // RELEVANT
+    // RELEVANT MESSAGES
     // =========================
 
     private String buildRelevantMessagesText(
@@ -560,11 +590,8 @@ public class ChatOrchestratorService {
         for (Message message : messages) {
 
             sb.append(message.getRole())
-
                     .append(": ")
-
                     .append(message.getContent())
-
                     .append("\n");
 
         }
@@ -574,7 +601,7 @@ public class ChatOrchestratorService {
     }
 
     // =========================
-    // SUMMARIES
+    // MEMORY SUMMARIES
     // =========================
 
     private String buildSummaryText(
@@ -587,7 +614,6 @@ public class ChatOrchestratorService {
         for (MemorySummary summary : summaries) {
 
             sb.append(summary.getSummary())
-
                     .append("\n");
 
         }
