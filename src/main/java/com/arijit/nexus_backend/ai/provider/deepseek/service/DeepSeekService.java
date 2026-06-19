@@ -15,8 +15,8 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class DeepSeekService {
 
-    @Value("${deepseek.api.key}")
-    private String apiKey;
+//    @Value("${deepseek.api.key}")
+    private String apiKey = "blaablaa";
 
     private final ObjectMapper objectMapper;
 
