@@ -1,5 +1,9 @@
 package com.arijit.nexus_backend.ai.executor.service;
 
+import com.arijit.nexus_backend.ai.agent.developer.service.DeveloperAgentService;
+import com.arijit.nexus_backend.ai.agent.refactorer.service.RefactorerAgentService;
+import com.arijit.nexus_backend.ai.agent.reviewer.dto.ReviewResult;
+import com.arijit.nexus_backend.ai.agent.reviewer.service.ReviewerAgentService;
 import com.arijit.nexus_backend.ai.artifact.dto.CodeArtifact;
 import com.arijit.nexus_backend.ai.artifact.service.ArtifactExtractionService;
 import com.arijit.nexus_backend.ai.artifact.structure.ProjectStructureBuilderService;
@@ -12,6 +16,7 @@ import com.arijit.nexus_backend.ai.response.parser.service.ParserRoutingService;
 import com.arijit.nexus_backend.ai.stream.dto.StreamingChunk;
 import com.arijit.nexus_backend.ai.stream.service.StreamingResponseBuilderService;
 import com.arijit.nexus_backend.ai.tool.entity.ToolCapability;
+import com.arijit.nexus_backend.ai.tool.entity.ToolDomain;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
@@ -36,6 +41,13 @@ public class CapabilityExecutionService {
 
     private final ResponsePostProcessingService
             responsePostProcessingService;
+
+    private final DeveloperAgentService developerAgentService;
+
+    private final ReviewerAgentService reviewerAgentService;
+
+    private final RefactorerAgentService
+            refactorerAgentService;
 
     public ExecutionMode resolveExecutionMode(
             ToolCapability capability
@@ -87,10 +99,101 @@ public class CapabilityExecutionService {
             ExecutionContext context
     ) {
 
-        String rawResponse =
-                groqService.generateResponse(
-                        context.getFinalPrompt()
+        String rawResponse;
+
+        if (
+                context.getArchitecturePlan()
+                        != null
+        ) {
+
+            rawResponse =
+                    developerAgentService.generateProject(
+
+                            context.getUserMessage(),
+
+                            context.getArchitecturePlan()
+
+                    );
+
+        }
+        else {
+
+            rawResponse =
+                    groqService.generateResponse(
+                            context.getFinalPrompt()
+                    );
+
+        }
+
+        ReviewResult reviewResult = null;
+
+        if (
+                context.getDomain()
+                        == ToolDomain.CODE
+                        &&
+                        context.getArchitecturePlan()
+                                != null
+        ) {
+
+            reviewResult =
+                    reviewerAgentService.review(
+
+                            context.getUserMessage(),
+
+                            rawResponse
+
+                    );
+
+            if (reviewResult != null) {
+
+                System.out.println(
+                        "\n================ REVIEW SUMMARY ================\n"
                 );
+
+                System.out.println(
+                        "SCORE = " +
+                                reviewResult.getScore()
+                );
+
+                System.out.println(
+                        "ISSUES = " +
+                                reviewResult.getIssues().size()
+                );
+
+                System.out.println(
+                        "\n================================================\n"
+                );
+
+            }
+
+            if (
+                    reviewResult != null
+                            &&
+                            reviewResult.getScore() < 90
+            ) {
+
+                System.out.println(
+                        "\n================ REFACTORING PROJECT ================\n"
+                );
+
+                rawResponse =
+                        refactorerAgentService.refactor(
+
+                                context.getUserMessage(),
+
+                                rawResponse,
+
+                                reviewResult
+
+                        );
+
+                System.out.println(
+                        "\n================ REFACTORING COMPLETE ================\n"
+                );
+
+            }
+
+        }
 
         rawResponse =
                 responsePostProcessingService
@@ -186,11 +289,21 @@ public class CapabilityExecutionService {
 
                         .filter(
                                 line ->
-                                        line.trim()
-                                                .startsWith("FILE:")
+                                        line.toUpperCase()
+                                                .contains("FILE:")
                         )
 
                         .count();
+
+        System.out.println(
+                "DOMAIN INSIDE SHOULD GENERATE = "
+                        + context.getDomain()
+        );
+
+        System.out.println(
+                "FILE COUNT = "
+                        + fileCount
+        );
 
         return fileCount > 0;
 

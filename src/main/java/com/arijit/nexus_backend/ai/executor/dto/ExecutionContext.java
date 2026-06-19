@@ -1,5 +1,6 @@
 package com.arijit.nexus_backend.ai.executor.dto;
 
+import com.arijit.nexus_backend.ai.agent.architect.dto.ArchitecturePlan;
 import com.arijit.nexus_backend.ai.executor.entity.ExecutionIntent;
 import com.arijit.nexus_backend.ai.executor.entity.ExecutionMode;
 import com.arijit.nexus_backend.ai.tool.entity.ToolCapability;
@@ -24,5 +25,7 @@ public class ExecutionContext {
     private ExecutionMode executionMode;
 
     private ExecutionIntent executionIntent;
+
+    private ArchitecturePlan architecturePlan;
 
 }

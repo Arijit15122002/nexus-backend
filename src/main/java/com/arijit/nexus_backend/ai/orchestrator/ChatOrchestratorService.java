@@ -1,5 +1,7 @@
 package com.arijit.nexus_backend.ai.orchestrator;
 
+import com.arijit.nexus_backend.ai.agent.technology.dto.TechnologyReviewResult;
+import com.arijit.nexus_backend.ai.agent.technology.service.TechnologyAgentService;
 import com.arijit.nexus_backend.ai.classifier.dto.MemoryClassificationResult;
 import com.arijit.nexus_backend.ai.classifier.service.MemoryClassifierService;
 import com.arijit.nexus_backend.ai.embedding.service.EmbeddingService;
@@ -13,6 +15,8 @@ import com.arijit.nexus_backend.ai.stream.dto.StreamingChunk;
 import com.arijit.nexus_backend.ai.stream.entity.StreamingChunkType;
 import com.arijit.nexus_backend.ai.tool.dto.CapabilityDetectionResult;
 import com.arijit.nexus_backend.ai.tool.service.ToolRoutingService;
+import com.arijit.nexus_backend.ai.agent.architect.dto.ArchitecturePlan;
+import com.arijit.nexus_backend.ai.agent.architect.service.ArchitectAgentService;
 import com.arijit.nexus_backend.conversation.entity.Conversation;
 import com.arijit.nexus_backend.conversation.service.ConversationService;
 import com.arijit.nexus_backend.memory.entity.MemorySummary;
@@ -64,6 +68,12 @@ public class ChatOrchestratorService {
 
     private final ExecutionIntentDetectionService
             executionIntentDetectionService;
+
+    private final ArchitectAgentService
+            architectAgentService;
+
+    private final TechnologyAgentService technologyAgentService;
+
 
     public Flux<StreamingChunk> chat(
 
@@ -237,6 +247,30 @@ public class ChatOrchestratorService {
                             trimmedPrompt
                     );
 
+            ArchitecturePlan architecturePlan = null;
+
+            if (
+                    executionIntent
+                            == ExecutionIntent.PROJECT_GENERATION
+            ) {
+
+                architecturePlan =
+                        architectAgentService.createPlan(
+                                trimmedPrompt
+                        );
+
+
+//                architecturePlan.updateVersions(
+//                        techReview.getUpdatedVersions()
+//                );
+
+                log.info(
+                        "ARCHITECT PLAN = {}",
+                        architecturePlan
+                );
+
+            }
+
             log.info(
                     "Intent={}",
                     executionIntent
@@ -261,16 +295,18 @@ public class ChatOrchestratorService {
 
                             executionIntent,
 
+                            architecturePlan,
+
                             trimmedPrompt,
 
                             assembledContext
 
                     );
 
-            log.info(
-                    "FINAL PROMPT:\n{}",
-                    finalPrompt
-            );
+//            log.info(
+//                    "FINAL PROMPT:\n{}",
+//                    finalPrompt
+//            );
 
             // =========================
             // EXECUTION CONTEXT
@@ -306,6 +342,10 @@ public class ChatOrchestratorService {
 
                             .executionIntent(
                                     executionIntent
+                            )
+
+                            .architecturePlan(
+                                    architecturePlan
                             )
 
                             .build();

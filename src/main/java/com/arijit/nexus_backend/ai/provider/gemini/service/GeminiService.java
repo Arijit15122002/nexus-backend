@@ -33,7 +33,7 @@ public class GeminiService {
     // =========================
 
     private static final String MODEL_GENERATE =
-            "/v1beta/models/gemini-1.5-flash-latest:generateContent";
+            "/v1beta/models/gemini-2.0-flash:generateContent";
 
     // =========================
     // NORMAL RESPONSE

@@ -1,5 +1,6 @@
 package com.arijit.nexus_backend.ai.prompt.service;
 
+import com.arijit.nexus_backend.ai.agent.architect.dto.ArchitecturePlan;
 import com.arijit.nexus_backend.ai.executor.entity.ExecutionIntent;
 import com.arijit.nexus_backend.ai.prompt.template.SystemPromptTemplate;
 import com.arijit.nexus_backend.ai.tool.entity.ToolCapability;
@@ -13,6 +14,8 @@ public class PromptEngineeringService {
             ToolCapability capability,
 
             ExecutionIntent executionIntent,
+
+            ArchitecturePlan architecturePlan,
 
             String userPrompt,
 
@@ -141,6 +144,12 @@ public class PromptEngineeringService {
                 buildIntentInstructions(executionIntent)
         );
 
+        prompt.append(
+                buildArchitecturePlanContext(
+                        architecturePlan
+                )
+        );
+
         // =====================================================
         // MEMORY CONTEXT
         // =====================================================
@@ -219,42 +228,49 @@ public class PromptEngineeringService {
                  BUG_FIXING,
                  CODE_REVIEW,
                  CODE_EXPLANATION -> """
-                    
-                    =====================================================
-                    SOFTWARE ENGINEERING MODE
-                    =====================================================
-                    
-                    You are operating as a senior software engineer.
-                    
-                    Focus on:
-                    
-                    - Clean architecture
-                    - SOLID principles
-                    - Maintainability
-                    - Scalability
-                    - Security
-                    - Performance
-                    - Modern best practices
-                    
-                    Prefer:
-                    
-                    - Spring Boot 3+
-                    - Java 21
-                    - PostgreSQL
-                    - Redis
-                    - Docker
-                    - JWT Authentication
-                    - Constructor Injection
-                    - Jakarta packages
-                    
-                    Avoid:
-                    
-                    - Deprecated APIs
-                    - Legacy Spring Security
-                    - Outdated dependencies
-                    - Obsolete Java patterns
-                    
-                    """;
+
+=====================================================
+SOFTWARE ENGINEERING MODE
+=====================================================
+
+You are operating as a senior software engineer.
+
+Focus on:
+
+- Clean Architecture
+- SOLID Principles
+- Maintainability
+- Scalability
+- Security
+- Performance
+- Modularity
+- Production Readiness
+
+Technology Rules:
+
+- Follow Architect Agent technology decisions
+- Follow Architect Agent version decisions
+- Follow Architect Agent architecture decisions
+- Follow Architect Agent module structure
+
+Always:
+
+- Use modern supported APIs
+- Use non-deprecated libraries
+- Use secure implementations
+- Use industry-standard patterns
+- Use constructor injection when applicable
+- Generate production-grade code
+
+Avoid:
+
+- Deprecated APIs
+- Legacy frameworks
+- Unsupported libraries
+- Outdated security practices
+- Obsolete patterns
+
+""";
 
             // =====================================================
             // AI ENGINEERING
@@ -449,6 +465,80 @@ public class PromptEngineeringService {
                     """;
 
         };
+
+    }
+
+    private String buildArchitecturePlanContext(
+            ArchitecturePlan plan
+    ) {
+
+        if (plan == null) {
+            return "";
+        }
+
+        return """
+
+=====================================================
+ARCHITECT AGENT OUTPUT
+=====================================================
+
+PROJECT TYPE:
+%s
+
+ARCHITECTURE STYLE:
+%s
+
+TECHNOLOGIES:
+%s
+
+PATTERNS:
+%s
+
+DATABASE STRATEGY:
+%s
+
+DEPLOYMENT STRATEGY:
+%s
+
+SECURITY STRATEGY:
+%s
+
+MODULES:
+%s
+
+FILES:
+%s
+
+=====================================================
+
+You MUST follow the Architect Agent decisions.
+
+Do not replace Architect decisions with your own assumptions.
+
+=====================================================
+
+"""
+                .formatted(
+
+                        plan.getProjectType(),
+
+                        plan.getArchitectureStyle(),
+
+                        plan.getTechnologies(),
+
+                        plan.getPatterns(),
+
+                        plan.getDatabaseStrategy(),
+
+                        plan.getDeploymentStrategy(),
+
+                        plan.getSecurityStrategy(),
+
+                        plan.getModules(),
+
+                        plan.getFiles()
+
+                );
 
     }
 
