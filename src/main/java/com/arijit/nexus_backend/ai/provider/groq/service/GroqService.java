@@ -16,8 +16,8 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class GroqService {
 
-    @Value("${groq.api.key}")
-    private String apiKey;
+//    @Value("${groq.api.key}")
+    private String apiKey = "blaablaa";
 
     private final ObjectMapper objectMapper;
 

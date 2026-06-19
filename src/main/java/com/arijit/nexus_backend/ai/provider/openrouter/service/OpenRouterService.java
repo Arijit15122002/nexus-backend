@@ -16,11 +16,11 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class OpenRouterService {
 
-    @Value("${openrouter.api.key}")
-    private String apiKey;
+//    @Value("${openrouter.api.key}")
+    private String apiKey = "blaablaaa";
 
-    @Value("${openrouter.model}")
-    private String model;
+//    @Value("${openrouter.model}")
+    private String model = "blaablaa";
 
     private final ObjectMapper objectMapper;
 
