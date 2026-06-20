@@ -34,13 +34,39 @@ public class GroqService {
 
                     "model", "llama-3.3-70b-versatile",
 
+                    "temperature", 0.1,
+
+                    "max_tokens", 8192,
+
                     "messages", List.of(
+
+                            Map.of(
+                                    "role", "system",
+                                    "content",
+                                    """
+                                    You are ORKA Developer Agent.
+            
+                                    Follow output format EXACTLY.
+            
+                                    Every file MUST begin with:
+            
+                                    FILE: relative/path/FileName.ext
+                                    LANGUAGE: language
+            
+                                    No explanations.
+                                    No notes.
+                                    No markdown outside files.
+            
+                                    If FILE is missing,
+                                    the response is invalid.
+                                    """
+                            ),
+
                             Map.of(
                                     "role", "user",
                                     "content", prompt
                             )
                     )
-
             );
 
             String response =

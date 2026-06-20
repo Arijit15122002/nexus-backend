@@ -25,6 +25,18 @@ public class StreamingResponseBuilderService {
             ProjectStructureNode structure
 
     ) {
+        if (rawResponse == null || rawResponse.isBlank()) {
+
+            return Flux.just(
+
+                    StreamingChunk.builder()
+                            .type(StreamingChunkType.COMPLETE)
+                            .completed(true)
+                            .build()
+
+            );
+
+        }
 
         List<StreamingChunk> chunks =
                 new ArrayList<>();
@@ -33,40 +45,53 @@ public class StreamingResponseBuilderService {
         // TEXT RESPONSE
         // =========================
 
-        chunks.add(
+        String[] textChunks =
+                rawResponse.split("(?<=[.!?])\\s+");
 
-                StreamingChunk.builder()
-                        .type(StreamingChunkType.TEXT)
-                        .content(rawResponse)
-                        .completed(false)
-                        .build()
+        for (String textChunk : textChunks) {
 
-        );
+            chunks.add(
+
+                    StreamingChunk.builder()
+                            .type(StreamingChunkType.TEXT)
+                            .content(textChunk + " ")
+                            .completed(false)
+                            .build()
+
+            );
+
+        }
 
         // =========================
         // SECTIONS
         // =========================
 
-        for (ResponseSection section : sections) {
+        boolean structuredResponse =
+                rawResponse.contains("## ");
 
-            chunks.add(
+        if (structuredResponse) {
 
-                    StreamingChunk.builder()
-                            .type(StreamingChunkType.SECTION)
-                            .metadata(
-                                    java.util.Map.of(
-                                            "title",
-                                            section.getTitle(),
+            for (ResponseSection section : sections) {
 
-                                            "type",
-                                            section.getSectionType()
-                                    )
-                            )
-                            .content(section.getContent())
-                            .completed(false)
-                            .build()
+                chunks.add(
 
-            );
+                        StreamingChunk.builder()
+                                .type(StreamingChunkType.SECTION)
+                                .metadata(
+                                        java.util.Map.of(
+                                                "title",
+                                                section.getTitle(),
+                                                "type",
+                                                section.getSectionType()
+                                        )
+                                )
+                                .content(section.getContent())
+                                .completed(false)
+                                .build()
+
+                );
+
+            }
 
         }
 
@@ -92,17 +117,27 @@ public class StreamingResponseBuilderService {
         // PROJECT STRUCTURE
         // =========================
 
-        chunks.add(
+        if (
+                structure != null
+                        &&
+                        structure.getChildren() != null
+                        &&
+                        !structure.getChildren().isEmpty()
+        ) {
 
-                StreamingChunk.builder()
-                        .type(
-                                StreamingChunkType.PROJECT_STRUCTURE
-                        )
-                        .projectStructure(structure)
-                        .completed(false)
-                        .build()
+            chunks.add(
 
-        );
+                    StreamingChunk.builder()
+                            .type(
+                                    StreamingChunkType.PROJECT_STRUCTURE
+                            )
+                            .projectStructure(structure)
+                            .completed(false)
+                            .build()
+
+            );
+
+        }
 
         // =========================
         // COMPLETE
@@ -117,7 +152,13 @@ public class StreamingResponseBuilderService {
 
         );
 
-        return Flux.fromIterable(chunks);
+        return Flux
+
+                .fromIterable(chunks)
+
+                .delayElements(
+                        java.time.Duration.ofMillis(30)
+                );
 
     }
 

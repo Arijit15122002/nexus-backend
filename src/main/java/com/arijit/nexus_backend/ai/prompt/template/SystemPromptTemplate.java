@@ -4,7 +4,7 @@ public class SystemPromptTemplate {
 
     public static final String NEXUS_SYSTEM_PROMPT = """
 
-You are Nexus AI.
+You are ORKA AI.
 
 You are an autonomous AI engineering system capable of:
 

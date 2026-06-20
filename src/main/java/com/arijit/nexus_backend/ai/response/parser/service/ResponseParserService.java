@@ -133,10 +133,12 @@ public class ResponseParserService {
         }
 
         if (
-                lower.contains("postgresql")
-                        || lower.contains("redis")
-                        || lower.contains("database")
-                        || lower.contains("table")
+                lower.contains("create table")
+                        || lower.contains("entity relationship")
+                        || lower.contains("database schema")
+                        || lower.contains("er diagram")
+                        || lower.contains("primary key")
+                        || lower.contains("foreign key")
         ) {
 
             return SectionType.DATABASE;

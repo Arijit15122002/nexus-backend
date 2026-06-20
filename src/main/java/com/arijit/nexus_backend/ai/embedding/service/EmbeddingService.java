@@ -19,11 +19,6 @@ public class EmbeddingService {
 
     private final RestTemplate restTemplate;
 
-    // Switch from gemini-embedding-001 (shared quota) to text-embedding-004
-    // text-embedding-004 has a SEPARATE quota of 1500 RPM on the free tier —
-    // meaning it will never compete with your chat/classification Gemini calls.
-    // Output dimension is 768 floats (same as gemini-embedding-001).
-
     private static final String EMBEDDING_URL =
             "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=";
 

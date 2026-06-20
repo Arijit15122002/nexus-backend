@@ -168,7 +168,7 @@ Do not return code blocks.
 
 Return JSON only.
 
-%s6
+%s
 
 """
                 .formatted(

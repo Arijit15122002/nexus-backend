@@ -274,39 +274,6 @@ public class CapabilityExecutionService {
             String rawResponse
 
     ) {
-
-        if (
-                context.getDomain()
-                        != com.arijit.nexus_backend.ai.tool.entity.ToolDomain.CODE
-        ) {
-
-            return false;
-
-        }
-
-        long fileCount =
-                rawResponse.lines()
-
-                        .filter(
-                                line ->
-                                        line.toUpperCase()
-                                                .contains("FILE:")
-                        )
-
-                        .count();
-
-        System.out.println(
-                "DOMAIN INSIDE SHOULD GENERATE = "
-                        + context.getDomain()
-        );
-
-        System.out.println(
-                "FILE COUNT = "
-                        + fileCount
-        );
-
-        return fileCount > 0;
-
+        return context.getDomain() == ToolDomain.CODE;
     }
-
 }

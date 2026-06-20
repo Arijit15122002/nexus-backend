@@ -13,10 +13,7 @@ public class ResponsePostProcessingService {
             return "";
         }
 
-        return response
-                .replace("```java", "\n```java")
-                .replace("```", "```")
-                .trim();
+        return response.trim();
 
     }
 

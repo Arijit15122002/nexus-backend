@@ -4,8 +4,8 @@ import com.arijit.nexus_backend.ai.artifact.dto.CodeArtifact;
 import com.arijit.nexus_backend.ai.artifact.entity.ArtifactType;
 import com.arijit.nexus_backend.ai.response.dto.ResponseSection;
 import com.arijit.nexus_backend.ai.response.entity.SectionType;
-import org.springframework.stereotype.Service;
 import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -13,12 +13,6 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class ArtifactExtractionService {
-
-    private final ArtifactNamingService
-            artifactNamingService;
-
-    private final ArtifactPathResolverService
-            artifactPathResolverService;
 
     public List<CodeArtifact> extractArtifacts(
             List<ResponseSection> sections
@@ -38,42 +32,54 @@ public class ArtifactExtractionService {
 
             }
 
+            String fullPath =
+                    section.getTitle();
+
+            if (
+                    fullPath == null
+                            || fullPath.isBlank()
+            ) {
+
+                continue;
+
+            }
+
+            String fileName;
+
+            String filePath;
+
+            if (fullPath.contains("/")) {
+
+                fileName =
+                        fullPath.substring(
+                                fullPath.lastIndexOf("/") + 1
+                        );
+
+                filePath =
+                        fullPath.substring(
+                                0,
+                                fullPath.lastIndexOf("/")
+                        );
+
+            }
+
+            else {
+
+                fileName =
+                        fullPath;
+
+                filePath =
+                        "";
+
+            }
+
             artifacts.add(
 
                     CodeArtifact.builder()
 
-                            .fileName(
+                            .fileName(fileName)
 
-                                    artifactNamingService
-                                            .generateFileName(
-
-                                                    section.getLanguage(),
-
-                                                    section.getContent()
-
-                                            )
-
-                            )
-
-                            .filePath(
-
-                                    artifactPathResolverService
-                                            .resolvePath(
-
-                                                    artifactNamingService
-                                                            .generateFileName(
-
-                                                                    section.getLanguage(),
-
-                                                                    section.getContent()
-
-                                                            ),
-
-                                                    determineArtifactType(section)
-
-                                            )
-
-                            )
+                            .filePath(filePath)
 
                             .language(
                                     section.getLanguage()
@@ -99,10 +105,6 @@ public class ArtifactExtractionService {
 
     }
 
-    // =========================
-    // ARTIFACT TYPE
-    // =========================
-
     private ArtifactType determineArtifactType(
             ResponseSection section
     ) {
@@ -122,14 +124,17 @@ public class ArtifactExtractionService {
                     ArtifactType.BACKEND_SOURCE;
 
             case "javascript",
-                 "typescript" ->
+                 "typescript",
+                 "jsx",
+                 "tsx" ->
                     ArtifactType.FRONTEND_SOURCE;
 
             case "sql" ->
                     ArtifactType.DATABASE_SCHEMA;
 
             case "dockerfile",
-                 "yaml" ->
+                 "yaml",
+                 "yml" ->
                     ArtifactType.DEPLOYMENT_CONFIG;
 
             default ->

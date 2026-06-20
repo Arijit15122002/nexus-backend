@@ -35,7 +35,7 @@ public class PromptEngineeringService {
                 NEXUS AI CORE SYSTEM
                 =====================================================
                 
-                You are Nexus AI.
+                You are ORKA AI.
                 
                 You are an elite-level autonomous AI engineering system.
                 

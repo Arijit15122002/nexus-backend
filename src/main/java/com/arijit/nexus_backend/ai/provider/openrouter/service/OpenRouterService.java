@@ -87,7 +87,7 @@ public class OpenRouterService {
 
                             .header(
                                     "X-Title",
-                                    "Nexus AI"
+                                    "ORKA AI"
                             )
 
                             .contentType(
