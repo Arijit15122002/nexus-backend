@@ -2,6 +2,8 @@ package com.arijit.nexus_backend.message.repository;
 
 import com.arijit.nexus_backend.conversation.entity.Conversation;
 import com.arijit.nexus_backend.message.entity.Message;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -90,5 +92,10 @@ public interface MessageRepository
     );
 
     long countByConversation(Conversation conversation);
+
+    Page<Message> findByConversationIdOrderByCreatedAtDesc(
+            Long conversationId,
+            Pageable pageable
+    );
 
 }
