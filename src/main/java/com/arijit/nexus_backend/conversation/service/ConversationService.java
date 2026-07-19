@@ -1,5 +1,6 @@
 package com.arijit.nexus_backend.conversation.service;
 
+import com.arijit.nexus_backend.conversation.dto.ConversationResponse;
 import com.arijit.nexus_backend.conversation.entity.Conversation;
 import com.arijit.nexus_backend.conversation.repository.ConversationRepository;
 import com.arijit.nexus_backend.user.entity.User;
@@ -27,11 +28,12 @@ public class ConversationService {
                         new RuntimeException("Conversation not found"));
     }
 
-    public Page<Conversation> getConversations(Long userId, int page, int size) {
+    public Page<ConversationResponse> getConversations(Long userId, int page, int size) {
 
         Pageable pageable = PageRequest.of(page, size);
 
-        return conversationRepository.findByUserIdOrderByUpdatedAtDesc(userId, pageable);
+        return conversationRepository.findByUserIdOrderByUpdatedAtDesc(userId, pageable)
+                .map(conversation -> new ConversationResponse(conversation.getId(), conversation.getTitle(), conversation.getCreatedAt()));
     }
 
 }
