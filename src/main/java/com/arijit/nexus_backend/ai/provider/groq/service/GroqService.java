@@ -26,7 +26,49 @@ public class GroqService {
                     .baseUrl("https://api.groq.com/openai/v1")
                     .build();
 
+    /**
+     * Default ORKA Developer Agent.
+     * Existing services continue using this method without any changes.
+     */
     public String generateResponse(String prompt) {
+
+        return generateResponse(
+
+                """
+                You are ORKA Developer Agent.
+
+                Follow output format EXACTLY.
+
+                Every file MUST begin with:
+
+                FILE: relative/path/FileName.ext
+                LANGUAGE: language
+
+                No explanations.
+                No notes.
+                No markdown outside files.
+
+                If FILE is missing,
+                the response is invalid.
+                """,
+
+                prompt
+
+        );
+
+    }
+
+    /**
+     * Generic Groq invocation.
+     * Allows every future Agent to define its own system prompt.
+     */
+    public String generateResponse(
+
+            String systemPrompt,
+
+            String userPrompt
+
+    ) {
 
         try {
 
@@ -38,38 +80,32 @@ public class GroqService {
 
                     "max_tokens", 8192,
 
-                    "messages", List.of(
+                    "messages",
+
+                    List.of(
 
                             Map.of(
+
                                     "role", "system",
-                                    "content",
-                                    """
-                                    You are ORKA Developer Agent.
-            
-                                    Follow output format EXACTLY.
-            
-                                    Every file MUST begin with:
-            
-                                    FILE: relative/path/FileName.ext
-                                    LANGUAGE: language
-            
-                                    No explanations.
-                                    No notes.
-                                    No markdown outside files.
-            
-                                    If FILE is missing,
-                                    the response is invalid.
-                                    """
+
+                                    "content", systemPrompt
+
                             ),
 
                             Map.of(
+
                                     "role", "user",
-                                    "content", prompt
+
+                                    "content", userPrompt
+
                             )
+
                     )
+
             );
 
             String response =
+
                     webClient.post()
 
                             .uri("/chat/completions")
@@ -79,9 +115,7 @@ public class GroqService {
                                     "Bearer " + apiKey
                             )
 
-                            .contentType(
-                                    MediaType.APPLICATION_JSON
-                            )
+                            .contentType(MediaType.APPLICATION_JSON)
 
                             .bodyValue(requestBody)
 
@@ -92,8 +126,11 @@ public class GroqService {
                             .block();
 
             if (
-                    response == null
-                            || response.isBlank()
+
+                    response == null ||
+
+                            response.isBlank()
+
             ) {
 
                 throw new RuntimeException(
@@ -103,17 +140,24 @@ public class GroqService {
             }
 
             JsonNode root =
+
                     objectMapper.readTree(response);
 
             JsonNode contentNode =
+
                     root.path("choices")
                             .path(0)
                             .path("message")
                             .path("content");
 
             if (
+
                     contentNode.isMissingNode()
-                            || contentNode.asText().isBlank()
+
+                            ||
+
+                            contentNode.asText().isBlank()
+
             ) {
 
                 throw new RuntimeException(
@@ -128,22 +172,23 @@ public class GroqService {
 
         catch (Exception e) {
 
-            e.printStackTrace();
-
             throw new RuntimeException(
+
                     "Groq generation failed: "
+
                             + e.getMessage(),
+
                     e
+
             );
 
         }
 
     }
 
-    // =========================
-    // FAKE STREAMING
-    // =========================
-
+    /**
+     * Backward-compatible fake streaming.
+     */
     public Flux<String> generateResponseStream(
             String prompt
     ) {

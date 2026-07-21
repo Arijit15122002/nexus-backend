@@ -1,17 +1,34 @@
 package com.arijit.nexus_backend.ai.executor.service;
 
 import com.arijit.nexus_backend.ai.executor.entity.ExecutionIntent;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 @Service
+@RequiredArgsConstructor
 public class ExecutionIntentDetectionService {
 
-    public ExecutionIntent detect(
-            String message
-    ) {
+    private final IntentClassificationService intentClassificationService;
 
-        String lower =
-                message.toLowerCase();
+    public ExecutionIntent detect(String message) {
+
+        try {
+
+            return intentClassificationService.classify(message);
+
+        }
+
+        catch (Exception ignored) {
+
+            return detectByKeywords(message);
+
+        }
+
+    }
+
+    private ExecutionIntent detectByKeywords(String message) {
+
+        String lower = message.toLowerCase();
 
         // =========================
         // DSA
@@ -124,7 +141,7 @@ public class ExecutionIntentDetectionService {
         }
 
         // =========================
-        // AI
+        // AI DESIGN
         // =========================
 
         if (
@@ -132,6 +149,9 @@ public class ExecutionIntentDetectionService {
                 lower.contains("ai agent")
                         || lower.contains("rag")
                         || lower.contains("orchestrator")
+                        || lower.contains("llm")
+                        || lower.contains("prompt engineering")
+                        || lower.contains("vector database")
 
         ) {
 
