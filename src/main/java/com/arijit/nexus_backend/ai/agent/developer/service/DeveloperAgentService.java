@@ -5,7 +5,6 @@ import com.arijit.nexus_backend.ai.agent.developer.prompt.DeveloperPromptBuilder
 import com.arijit.nexus_backend.ai.provider.deepseek.service.DeepSeekService;
 import com.arijit.nexus_backend.ai.provider.gemini.service.GeminiService;
 import com.arijit.nexus_backend.ai.provider.groq.service.GroqService;
-import com.arijit.nexus_backend.ai.provider.openrouter.service.OpenRouterService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
