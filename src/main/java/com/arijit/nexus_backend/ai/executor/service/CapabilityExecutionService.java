@@ -117,7 +117,7 @@ public class CapabilityExecutionService {
 
         }
         else {
-
+            System.out.println("========== MAIN GROQ GENERATION ==========");
             rawResponse =
                     groqService.generateResponse(
                             context.getFinalPrompt()

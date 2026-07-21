@@ -166,6 +166,8 @@ Do not use markdown.
 
         try {
 
+            System.out.println("========== INTENT CLASSIFICATION ==========");
+
             String result =
                     groqService.generateResponse(
 
@@ -174,6 +176,7 @@ Do not use markdown.
                             userPrompt
 
                     );
+            System.out.println("Intent = " + result);
 
             result =
                     result
