@@ -10,6 +10,7 @@ import com.arijit.nexus_backend.ai.artifact.structure.ProjectStructureBuilderSer
 import com.arijit.nexus_backend.ai.artifact.structure.ProjectStructureNode;
 import com.arijit.nexus_backend.ai.executor.dto.ExecutionContext;
 import com.arijit.nexus_backend.ai.executor.entity.ExecutionMode;
+import com.arijit.nexus_backend.ai.provider.service.AIModelRoutingService;
 import com.arijit.nexus_backend.ai.response.dto.ResponseSection;
 import com.arijit.nexus_backend.ai.response.parser.service.ParserRoutingService;
 import com.arijit.nexus_backend.ai.stream.dto.StreamingChunk;
@@ -21,7 +22,6 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import com.arijit.nexus_backend.ai.provider.dto.AIRequest;
 import com.arijit.nexus_backend.ai.provider.dto.AIResponse;
-import com.arijit.nexus_backend.ai.provider.model.AIProviderType;
 import com.arijit.nexus_backend.ai.provider.service.AIService;
 
 import java.util.List;
@@ -30,7 +30,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class CapabilityExecutionService {
 
-    private final AIService aiService;
+    private final AIModelRoutingService aiModelRoutingService;
 
     private final ParserRoutingService parserRoutingService;
 
@@ -51,6 +51,7 @@ public class CapabilityExecutionService {
 
     private final RefactorerAgentService
             refactorerAgentService;
+    private final AIService aIService;
 
     public ExecutionMode resolveExecutionMode(
             ToolCapability capability
@@ -121,45 +122,11 @@ public class CapabilityExecutionService {
         }
         else {
             System.out.println("========== NVIDIA GENERATION ==========");
-            AIResponse response = aiService.generate(
+            AIRequest request =
+                    aiModelRoutingService.route(context);
 
-                    AIRequest.builder()
-
-                            .provider(AIProviderType.NVIDIA)
-
-                            .model("nvidia/nemotron-3-nano-omni-30b-a3b-reasoning")
-
-                            .systemPrompt(
-                                    """
-                                    You are ORKA Developer Agent.
-            
-                                    Follow output format EXACTLY.
-            
-                                    Every file MUST begin with:
-            
-                                    FILE: relative/path/FileName.ext
-                                    LANGUAGE: language
-            
-                                    No explanations.
-                                    No notes.
-                                    No markdown outside files.
-            
-                                    If FILE is missing,
-                                    the response is invalid.
-                                    """
-                            )
-
-                            .userPrompt(context.getFinalPrompt())
-
-                            .temperature(0.6)
-
-                            .maxTokens(8192)
-
-                            .stream(false)
-
-                            .build()
-
-            );
+            AIResponse response =
+                    aIService.generate(request);
 
             rawResponse = response.getContent();
 
@@ -242,7 +209,7 @@ public class CapabilityExecutionService {
                         );
 
         System.out.println(
-                "\n================ RAW GROQ RESPONSE ================\n"
+                "\n================ RAW AI RESPONSE ================\n"
         );
 
         System.out.println(rawResponse);
