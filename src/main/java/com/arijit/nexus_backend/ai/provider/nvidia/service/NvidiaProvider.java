@@ -115,9 +115,10 @@ public class NvidiaProvider implements AIProvider {
 
                             .bodyToMono(String.class)
 
-                            .doOnNext(System.out::println)
-
                             .block();
+
+                            System.out.println("RAW NVIDIA RESPONSE:");
+                            System.out.println(response);
 
             if (
 
