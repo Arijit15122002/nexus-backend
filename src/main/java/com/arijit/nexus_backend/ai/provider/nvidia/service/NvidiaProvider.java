@@ -57,8 +57,6 @@ public class NvidiaProvider implements AIProvider {
 
                     "max_tokens", request.getMaxTokens(),
 
-                    "reasoning_effort", "high",
-
                     "stream", request.getStream(),
 
                     "messages",
@@ -107,7 +105,17 @@ public class NvidiaProvider implements AIProvider {
 
                             .retrieve()
 
+                            .onStatus(
+                                    status -> status.isError(),
+                                    responseBody -> responseBody.bodyToMono(String.class)
+                                            .map(body -> new RuntimeException(
+                                                    "NVIDIA Error: " + body
+                                            ))
+                            )
+
                             .bodyToMono(String.class)
+
+                            .doOnNext(System.out::println)
 
                             .block();
 
