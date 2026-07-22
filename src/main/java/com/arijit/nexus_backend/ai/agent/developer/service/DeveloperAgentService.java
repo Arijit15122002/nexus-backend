@@ -39,7 +39,7 @@ public class DeveloperAgentService {
 
                 .provider(AIProviderType.NVIDIA)
 
-                .model("mistralai/mistral-medium-3.5-128b")
+                .model("openai/gpt-oss-120b")
 
                 .systemPrompt("""
                         You are ORKA's Principal Software Engineer.
@@ -61,11 +61,13 @@ public class DeveloperAgentService {
 
                 .temperature(0.7)
 
-                .maxTokens(16384)
+                .maxTokens(2048)
 
                 .stream(false)
 
                 .build();
+
+        log.info("Developer prompt characters: {}", prompt.length());
 
         AIResponse aiResponse =
                 aiService.generate(request);
