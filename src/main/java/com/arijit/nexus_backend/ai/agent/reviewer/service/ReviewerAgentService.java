@@ -2,7 +2,10 @@ package com.arijit.nexus_backend.ai.agent.reviewer.service;
 
 import com.arijit.nexus_backend.ai.agent.reviewer.dto.ReviewResult;
 import com.arijit.nexus_backend.ai.agent.reviewer.parser.ReviewResultParserService;
-import com.arijit.nexus_backend.ai.provider.groq.service.GroqService;
+import com.arijit.nexus_backend.ai.provider.dto.AIRequest;
+import com.arijit.nexus_backend.ai.provider.dto.AIResponse;
+import com.arijit.nexus_backend.ai.provider.model.AIProviderType;
+import com.arijit.nexus_backend.ai.provider.service.AIService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -12,7 +15,7 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class ReviewerAgentService {
 
-    private final GroqService groqService;
+    private final AIService aiService;
 
     private final ReviewerPromptBuilderService
             promptBuilderService;
@@ -37,15 +40,49 @@ public class ReviewerAgentService {
                         generatedProject
                 );
 
-//        log.info(
-//                "\n================ REVIEWER PROMPT ================\n{}\n==================================================",
-//                prompt
-//        );
+        AIRequest request = AIRequest.builder()
+
+                .provider(AIProviderType.NVIDIA)
+
+                .model("deepseek-ai/deepseek-v4-pro")
+
+                .systemPrompt("""
+                        You are ORKA's Principal Code Reviewer.
+
+                        Review the generated project thoroughly.
+
+                        Detect:
+
+                        - Security issues
+                        - Performance issues
+                        - Architecture violations
+                        - Missing files
+                        - Bugs
+                        - Incorrect implementations
+                        - Best practice violations
+
+                        Return ONLY valid JSON.
+
+                        Do not return markdown.
+
+                        Do not explain outside JSON.
+                        """)
+
+                .userPrompt(prompt)
+
+                .temperature(1.0)
+
+                .maxTokens(16384)
+
+                .stream(false)
+
+                .build();
+
+        AIResponse aiResponse =
+                aiService.generate(request);
 
         String response =
-                groqService.generateResponse(
-                        prompt
-                );
+                aiResponse.getContent();
 
         log.info(
                 "\n================ REVIEWER RAW RESPONSE ================\n{}\n====================================================",
