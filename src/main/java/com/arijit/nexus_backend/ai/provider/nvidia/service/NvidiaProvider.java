@@ -53,11 +53,11 @@ public class NvidiaProvider implements AIProvider {
 
                     "temperature", request.getTemperature(),
 
-                    "top_p", 0.95,
+                    "top_p", 1,
 
                     "max_tokens", request.getMaxTokens(),
 
-                    "reasoning_budget", 16384,
+                    "reasoning_effort", "high",
 
                     "stream", request.getStream(),
 
@@ -164,14 +164,11 @@ public class NvidiaProvider implements AIProvider {
 
         catch (Exception e) {
 
+            e.printStackTrace();
+
             throw new RuntimeException(
-
-                    "NVIDIA generation failed : "
-
-                            + e.getMessage(),
-
+                    "NVIDIA generation failed",
                     e
-
             );
 
         }

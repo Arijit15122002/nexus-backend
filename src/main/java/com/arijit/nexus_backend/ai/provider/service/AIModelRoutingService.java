@@ -53,7 +53,7 @@ public class AIModelRoutingService {
 
                 .provider(AIProviderType.NVIDIA)
 
-                .model("z-ai/glm-5.2")
+                .model("mistralai/mistral-medium-3.5-128b")
 
                 .systemPrompt("""
                         You are ORKA Senior Software Engineer.
@@ -74,7 +74,7 @@ public class AIModelRoutingService {
 
                 .userPrompt(context.getFinalPrompt())
 
-                .temperature(0.5)
+                .temperature(0.7)
 
                 .maxTokens(16384)
 
